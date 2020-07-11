@@ -44,7 +44,8 @@ async fn main() {
 
 const PORT: u16 = 0xC_C_24; // C_C_Z
 
-async fn get_my_name(sock: &UdpSocket) -> anyhow::Result<String> {
+async fn get_my_name() -> anyhow::Result<String> {
+    let sock = UdpSocket::bind(("0.0.0.0", 0)).await?;
     sock.send_to(b"get-name", ("127.0.0.1", PORT)).await?;
 
     let mut buf = [0; 512];
@@ -54,9 +55,7 @@ async fn get_my_name(sock: &UdpSocket) -> anyhow::Result<String> {
 }
 
 async fn boop(name: Option<String>) -> anyhow::Result<()> {
-    let sock = UdpSocket::bind(("0.0.0.0", 0)).await?;
-    let my_name = get_my_name(&sock).await?;
-    sock.set_broadcast(true)?;
+    let my_name = get_my_name().await?;
 
     let mut buf = [0; 512];
     let buflen = {
@@ -69,7 +68,9 @@ async fn boop(name: Option<String>) -> anyhow::Result<()> {
         cursor.position() as usize
     };
 
-    sock.send_to(&buf[..buflen], ("255.255.255.255", PORT))
+    let sock = UdpSocket::bind(("0.0.0.0", 0)).await?;
+    sock.set_broadcast(true)?;
+    sock.send_to(&buf[..buflen], ("192.168.1.255", PORT))
         .await?;
     Ok(())
 }
@@ -124,10 +125,7 @@ fn install(name: String) -> anyhow::Result<()> {
         path = exe.to_string_lossy(),
         name = name
     );
-    let args = format!(
-        "-windowstyle hidden -command \"{cmd}\"",
-        cmd = cmd
-    );
+    let args = format!("-windowstyle hidden -command \"{cmd}\"", cmd = cmd);
 
     let appdata = std::env::var("APPDATA")?;
     let startup = format!(
